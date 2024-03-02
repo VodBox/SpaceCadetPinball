@@ -112,5 +112,8 @@ private:
 	static void RenderFrameTimeDialog();
 	static void HybridSleep(DurationMs seconds);
 	static void MainLoop();
+#ifdef __EMSCRIPTEN__
+	static void EmscriptenLoop();
+#endif
 	static void ImGuiMenuItemWShortcut(GameBindings binding, bool selected = false);
 };

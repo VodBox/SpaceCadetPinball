@@ -190,6 +190,10 @@ public:
 	static void TimeWarpPartTwoController(MessageCode code, TPinballComponent* caller);
 	static void UnselectMissionController(MessageCode code, TPinballComponent* caller);
 	static void WaitingDeploymentController(MessageCode code, TPinballComponent* caller);
+
+	static void StartDeployed();
+	static void SendInBall();
+
 private:
 	static int extraball_light_flag;
 };

@@ -1,7 +1,6 @@
 #include "pch.h"
 #include "pb.h"
 
-
 #include "control.h"
 #include "fullscrn.h"
 #include "high_score.h"
@@ -40,7 +39,6 @@ std::string pb::DatFileName, pb::BasePath;
 ImU32 pb::TextBoxColor;
 int pb::quickFlag = 0;
 TTextBox *pb::InfoTextBox, *pb::MissTextBox;
-
 
 int pb::init()
 {
@@ -217,7 +215,7 @@ void pb::mode_change(GameModes mode)
 		else
 		{
 			winmain::LaunchBallEnabled = true;
-			winmain::HighScoresEnabled = true;
+			winmain::HighScoresEnabled = false;
 			winmain::DemoActive = false;
 			if (MainTable)
 			{
@@ -230,7 +228,7 @@ void pb::mode_change(GameModes mode)
 		winmain::LaunchBallEnabled = false;
 		if (!demo_mode)
 		{
-			winmain::HighScoresEnabled = true;
+			winmain::HighScoresEnabled = false;
 			winmain::DemoActive = false;
 		}
 		if (MainTable && MainTable->LightGroup)
@@ -714,7 +712,23 @@ void pb::end_game()
 				}
 
 				strncpy(entry.Name, playerName, sizeof entry.Name - 1);
+#ifndef __EMSCRIPTEN__
 				high_score::show_and_set_high_score_dialog({entry, -1});
+#else
+				EM_ASM({
+					const event = new CustomEvent("pinballScore", {
+						detail: {
+							score: $0,
+						},
+					});
+					window.dispatchEvent(event);
+				}, entry.Score);
+
+				timer::set(2, nullptr, [](int, void*) {
+					mode_change(GameModes::InGame);
+					pb::MainTable->Message(MessageCode::NewGame, 1.0);
+				});
+#endif
 			}
 		}
 	}
@@ -796,3 +810,246 @@ float pb::BallToBallCollision(const ray_type& ray, const TBall& ball, TEdgeSegme
 
 	return collisionDistance;
 }
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten/bind.h>
+using namespace emscripten;
+
+struct BallState {
+	vector3 Position;
+	vector3 PrevPosition;
+	vector3 Direction;
+	float Speed;
+	float RayMaxDistance;
+	float TimeDelta;
+	bool Active;
+};
+
+struct TableState {
+	int Score;
+	int ScoreE9Part;
+
+	int ScoreMultiplier;
+	int ScoreAdded;
+	int JackpotScore;
+	bool JackpotScoreFlag;
+	int BonusScore;
+	bool BonusScoreFlag;
+	int ReflexShotScore;
+
+	int ExtraBalls;
+	int BallCount;
+	int BallLockedCounter;
+
+	emscripten::val BallList;
+
+	bool ReplayActiveFlag;
+};
+
+void Pause(bool pause)
+{
+	if (pause)
+		winmain::pause(false);
+	else
+		winmain::end_pause();
+}
+
+bool AddBall(float a, float b)
+{
+	vector2 pos{a, b};
+
+	while(pb::MainTable->BallCountInRect(pos, 0.05) > 0)
+		pos.Y += 0.05;
+
+	TBall *ball = pb::MainTable->AddBall(pos);
+	if (!ball) return false;
+
+	pb::MainTable->MultiballCount++;
+
+	if (pb::MainTable->MultiballCount == 1)
+		control::StartDeployed();
+
+	return true;
+}
+
+void SendBall()
+{
+	if (pb::MainTable->MultiballCount == 0)
+		control::StartDeployed();
+	control::SendInBall();
+}
+
+int BallCount()
+{
+	return pb::MainTable->BallCount;
+}
+
+int GetScore()
+{
+	return pb::MainTable->CurScore;
+}
+
+void ToggleLeftFlipper(bool up)
+{
+	if (up)
+		pb::MainTable->FlipperL->Message(MessageCode::TFlipperExtend, 0.0);
+	else
+		pb::MainTable->FlipperL->Message(MessageCode::TFlipperRetract, 0.0);
+}
+
+void ToggleRightFlipper(bool up)
+{
+	if (up)
+		pb::MainTable->FlipperL->Message(MessageCode::TFlipperExtend, 0.0);
+	else
+		pb::MainTable->FlipperL->Message(MessageCode::TFlipperRetract, 0.0);
+}
+
+TableState Serialize()
+{
+	TableState state;
+
+	state.Score = pb::MainTable->CurScore;
+
+	state.Score = pb::MainTable->CurScore;
+	state.ScoreE9Part = pb::MainTable->CurScoreE9;
+	state.ScoreMultiplier = pb::MainTable->ScoreMultiplier;
+	state.ScoreAdded = pb::MainTable->ScoreAdded;
+	state.JackpotScore = pb::MainTable->JackpotScore;
+	state.JackpotScoreFlag = pb::MainTable->JackpotScoreFlag;
+	state.BonusScore = pb::MainTable->BonusScore;
+	state.BonusScoreFlag = pb::MainTable->BonusScoreFlag;
+	state.ReflexShotScore = pb::MainTable->ReflexShotScore;
+	state.ExtraBalls = pb::MainTable->ExtraBalls;
+	state.BallCount = pb::MainTable->BallCount;
+	state.BallLockedCounter = pb::MainTable->BallLockedCounter;
+	state.ReplayActiveFlag = pb::MainTable->ReplayActiveFlag;
+
+	val ballList = emscripten::val::array();
+
+	for (auto &ball : pb::MainTable->BallList) {
+		BallState ballState;
+
+		ballState.Position = ball->Position;
+		ballState.PrevPosition = ball->PrevPosition;
+		ballState.Direction = ball->Direction;
+		ballState.Speed = ball->Speed;
+		ballState.TimeDelta = ball->TimeDelta;
+		ballState.Active = ball->ActiveFlag;
+
+		ballList.call<void>("push", ballState);
+	}
+
+	state.BallList = ballList;
+	
+	return state;
+}
+
+void Deserialize(TableState state)
+{
+	winmain::end_pause();
+	pb::MainTable->Message(MessageCode::NewGame, 1.0);
+
+	timer::kill(pb::MainTable->LightShowTimer);
+	pb::MainTable->LightShowTimer = 0;
+
+	pb::MainTable->Message(MessageCode::StartGamePlayer1, 1.0);
+
+	timer::kill(pb::MainTable->Plunger->BallFeedTimer);
+
+	pb::MainTable->CurScore = state.Score;
+	pb::MainTable->CurScoreE9 = state.ScoreE9Part;
+	pb::MainTable->ScoreMultiplier = state.ScoreMultiplier;
+	pb::MainTable->ScoreAdded = state.ScoreAdded;
+	pb::MainTable->JackpotScore = state.JackpotScore;
+	pb::MainTable->JackpotScoreFlag = state.JackpotScoreFlag;
+	pb::MainTable->BonusScore = state.BonusScore;
+	pb::MainTable->BonusScoreFlag = state.BonusScoreFlag;
+	pb::MainTable->ReflexShotScore = state.ReflexShotScore;
+	pb::MainTable->ExtraBalls = state.ExtraBalls;
+	pb::MainTable->ChangeBallCount(state.BallCount);
+	pb::MainTable->BallLockedCounter = state.BallLockedCounter;
+	pb::MainTable->ReplayActiveFlag = state.ReplayActiveFlag;
+
+	pb::MainTable->AddScore(0);
+
+	for (auto &ball : pb::MainTable->BallList) {
+		ball->Disable();
+		delete ball;
+	}
+
+	pb::MainTable->BallList.clear();
+
+	std::vector<BallState> ballList = vecFromJSArray<BallState>(state.BallList);
+
+	for (auto &ballState : ballList) {
+		TBall *ball = new TBall(pb::MainTable, -1);
+
+		ball->Position.X = ballState.Position.X;
+		ball->Position.Y = ballState.Position.Y;
+		ball->Position.Z = ballState.Position.Z;
+		ball->PrevPosition.X = ballState.PrevPosition.X;
+		ball->PrevPosition.Y = ballState.PrevPosition.Y;
+		ball->PrevPosition.Z = ballState.PrevPosition.Z;
+		ball->Direction.X = ballState.Direction.X;
+		ball->Direction.Y = ballState.Direction.Y;
+		ball->Direction.Z = ballState.Direction.Z;
+
+		ball->Speed = ballState.Speed;
+		ball->TimeDelta = ballState.TimeDelta;
+
+		if (!ballState.Active) {
+			ball->Disable();
+		}
+
+		pb::MainTable->BallList.push_back(ball);
+	}
+}
+
+EMSCRIPTEN_BINDINGS(pinball)
+{
+	value_array<vector3>("vector3")
+		.element(&vector3::X)
+		.element(&vector3::Y)
+		.element(&vector3::Z);
+
+	value_object<BallState>("BallState")
+		.field("position", &BallState::Position)
+		.field("prevPosition", &BallState::PrevPosition)
+		.field("direction", &BallState::Direction)
+		.field("speed", &BallState::Speed)
+		.field("RayMaxDistance", &BallState::RayMaxDistance)
+		.field("timeDelta", &BallState::TimeDelta)
+		.field("active", &BallState::Active);
+
+	register_vector<BallState>("vector<BallState>");
+
+	value_object<TableState>("TableState")
+		.field("score", &TableState::Score)
+		.field("scoreE9Part", &TableState::ScoreE9Part)
+		.field("scoreMultiplier", &TableState::ScoreMultiplier)
+		.field("scoreAdded", &TableState::ScoreAdded)
+		.field("jackpotScore", &TableState::JackpotScore)
+		.field("jackpotScoreFlag", &TableState::JackpotScoreFlag)
+		.field("bonusScore", &TableState::BonusScore)
+		.field("bonusScoreFlag", &TableState::BonusScoreFlag)
+		.field("reflexShotScore", &TableState::ReflexShotScore)
+		.field("extraBalls", &TableState::ExtraBalls)
+		.field("ballCount", &TableState::BallCount)
+		.field("ballLockedCounter", &TableState::BallLockedCounter)
+		.field("ballList", &TableState::BallList)
+		.field("replayActiveFlag", &TableState::ReplayActiveFlag);
+
+	function("addBall", &AddBall);
+	function("sendBall", &SendBall);
+	function("pause", &Pause);
+	function("ballCount", &BallCount);
+	function("getScore", &GetScore);
+
+	function("toggleLeftFlipper", &ToggleLeftFlipper);
+	function("toggleRightFlipper", &ToggleRightFlipper);
+
+	function("Serialize", &Serialize);
+	function("Deserialize", &Deserialize);
+}
+#endif

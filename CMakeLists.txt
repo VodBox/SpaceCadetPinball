@@ -31,16 +31,27 @@ endif()
 # SDL2main is not needed
 set(SDL2_BUILDING_LIBRARY ON)
 
-find_package(SDL2 REQUIRED)
-FIND_PACKAGE(SDL2_mixer REQUIRED)
+if(${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
+    set(USE_FLAGS "-sUSE_SDL=2 -sUSE_SDL_MIXER=2")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${USE_FLAGS}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${USE_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${USE_FLAGS} -sMODULARIZE -sEXPORT_NAME=SpaceCadetPinball -O3 -sSTACK_SIZE=70000 -sALLOW_MEMORY_GROWTH --preload-file resources@/ -lembind")
+    set(CMAKE_EXECUTABLE_SUFFIX .js)
+
+    list(APPEND SDL2_PATH "${EMSCRIPTEN_ROOT_PATH}/system/include/SDL2/")
+    list(APPEND SDL2_MIXER_PATH "${EMSCRIPTEN_ROOT_PATH}/system/include/SDL2/")
+else()
+    find_package(SDL2 REQUIRED)
+    FIND_PACKAGE(SDL2_mixer REQUIRED)
+endif()
+
 
 include_directories(${SDL2_INCLUDE_DIR} ${SDL2_MIXER_INCLUDE_DIR})
+
 get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
 foreach(dir ${dirs})
   message(STATUS "Include dir='${dir}'")
 endforeach()
-
-
 
 set(SOURCE_FILES
         SpaceCadetPinball/control.cpp
@@ -215,7 +226,12 @@ if(${CMAKE_VERSION} VERSION_GREATER "3.16.0" OR ${CMAKE_VERSION} VERSION_EQUAL "
             )
 endif()
 
-target_link_libraries(SpaceCadetPinball ${SDL2_LIBRARY} ${SDL2_MIXER_LIBRARY})
+if(${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
+    target_link_libraries(SpaceCadetPinball ${SDL2_LIBRARIES})
+else()
+    target_link_libraries(SpaceCadetPinball ${SDL2_LIBRARY} ${SDL2_MIXER_LIBRARY})
+endif()
+
 
 # On Windows, copy DLL to output
 if(WIN32)

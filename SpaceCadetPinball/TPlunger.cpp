@@ -78,7 +78,7 @@ int TPlunger::Message(MessageCode code, float value)
 		break;
 	case MessageCode::PlungerFeedBall:
 		{
-			if (PinballTable->BallCountInRect(PinballTable->PlungerPosition, PinballTable->CollisionCompOffset * 1.2f))
+			/**if (PinballTable->BallCountInRect(PinballTable->PlungerPosition, PinballTable->CollisionCompOffset * 1.2f))
 			{
 				timer::set(1.0f, this, BallFeedTimer);
 			}
@@ -89,7 +89,7 @@ int TPlunger::Message(MessageCode code, float value)
 				PinballTable->MultiballCount++;
 				PinballTable->BallInDrainFlag = 0;
 				pb::tilt_no_more();
-			}
+			}**/
 			break;
 		}
 	case MessageCode::PlungerStartFeedTimer:

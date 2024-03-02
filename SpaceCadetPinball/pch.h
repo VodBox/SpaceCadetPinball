@@ -69,6 +69,9 @@ inline void ImGui_Render_NewFrame() { }
 inline void ImGui_Render_RenderDrawData(ImDrawData* draw_data) { ImGuiSDL::Render(draw_data); }
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 typedef char* LPSTR;
 typedef const char* LPCSTR;

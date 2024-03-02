@@ -4601,3 +4601,21 @@ void control::WaitingDeploymentController(MessageCode code, TPinballComponent* c
 		break;
 	}
 }
+
+void control::StartDeployed()
+{
+	pb::MainTable->Plunger->Message(MessageCode::PlungerLaunchBall, 0.0f);
+	skill_shot_lights->Message(MessageCode::TLightGroupReset, 0.0);
+	skill_shot_lights->Message(MessageCode::TLightResetAndTurnOff, 0.0);
+	lite67->Message(MessageCode::TLightResetAndTurnOn, 0.0);
+	lite54->Message(MessageCode::TLightFlasherStartTimed, 5.0);
+	lite25->Message(MessageCode::TLightFlasherStartTimed, 5.0);
+	fuel_bargraph->Message(MessageCode::TLightGroupToggleSplitIndex, 11.0);
+	control::handler(MessageCode::ControlCollision, oneway10);
+	ShootAgainLightControl(MessageCode::ControlTimerExpired, lite200);
+}
+
+void control::SendInBall()
+{
+	EscapeChuteSinkControl(MessageCode::ControlCollision, sink7);
+}

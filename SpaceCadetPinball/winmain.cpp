@@ -40,7 +40,7 @@ bool winmain::ShowImGuiDemo = false;
 bool winmain::ShowSpriteViewer = false;
 bool winmain::ShowExitPopup = false;
 bool winmain::LaunchBallEnabled = true;
-bool winmain::HighScoresEnabled = true;
+bool winmain::HighScoresEnabled = false;
 bool winmain::DemoActive = false;
 int winmain::MainMenuHeight = 0;
 std::string winmain::FpsDetails, winmain::PrevSdlError;
@@ -115,7 +115,7 @@ int winmain::WinMain(LPCSTR lpCmdLine)
 	auto basePath = SDL_GetBasePath();
 
 	// SDL mixer init
-	bool mixOpened = false, noAudio = strstr(lpCmdLine, "-noaudio") != nullptr;
+	bool mixOpened = false, noAudio = true; //strstr(lpCmdLine, "-noaudio") != nullptr;
 	if (!noAudio)
 	{
 		if ((Mix_Init(MIX_INIT_MID_Proxy) & MIX_INIT_MID_Proxy) == 0)
@@ -263,7 +263,11 @@ int winmain::WinMain(LPCSTR lpCmdLine)
 		else
 			pb::replay_level(false);
 
+#ifdef __EMSCRIPTEN__
+		emscripten_set_main_loop(EmscriptenLoop, 0, true);
+#else
 		MainLoop();
+#endif
 
 		options::uninit();
 		midi::music_shutdown();
@@ -291,6 +295,105 @@ int winmain::WinMain(LPCSTR lpCmdLine)
 
 	return return_value;
 }
+
+#ifdef __EMSCRIPTEN__
+void winmain::EmscriptenLoop()
+{
+	if (!ProcessWindowMessages() || bQuit)
+		emscripten_cancel_main_loop();
+
+	if (has_focus)
+	{
+		if (mouse_down)
+		{
+			int x, y, w, h;
+			SDL_GetMouseState(&x, &y);
+			SDL_GetWindowSize(MainWindow, &w, &h);
+			float dx = static_cast<float>(last_mouse_x - x) / static_cast<float>(w);
+			float dy = static_cast<float>(y - last_mouse_y) / static_cast<float>(h);
+			pb::ballset(dx, dy);
+
+			// Original creates continuous mouse movement with mouse capture.
+			// Alternative solution: mouse warp at window edges.
+			int xMod = 0, yMod = 0;
+			if (x == 0 || x >= w - 1)
+				xMod = w - 2;
+			if (y == 0 || y >= h - 1)
+				yMod = h - 2;
+			if (xMod != 0 || yMod != 0)
+			{
+				// Mouse warp does not work over remote desktop or in some VMs
+				x = abs(x - xMod);
+				y = abs(y - yMod);
+				SDL_WarpMouseInWindow(MainWindow, x, y);
+			}
+
+			last_mouse_x = x;
+			last_mouse_y = y;
+		}
+		if (!single_step && !no_time_loss)
+		{
+			auto dt = 1000.0f / 60.0f;
+			pb::frame(dt);
+			if (DispGRhistory)
+			{
+				auto targetSize = static_cast<unsigned>(static_cast<float>(Options.UpdatesPerSecond) * gfrWindow);
+				if (gfrDisplay.size() != targetSize)
+				{
+					gfrDisplay.resize(targetSize, static_cast<float>(TargetFrameTime.count()));
+					gfrOffset = 0;
+				}
+				gfrDisplay[gfrOffset] = dt;
+				gfrOffset = (gfrOffset + 1) % gfrDisplay.size();
+			}
+		}
+		no_time_loss = false;
+
+		if (Options.HideCursor && CursorIdleCounter <= 0)
+			ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+		ImGui_ImplSDL2_NewFrame();
+		ImGui_Render_NewFrame();
+		ImGui::NewFrame();
+		RenderUi();
+
+		SDL_RenderClear(Renderer);
+		// Alternative clear hack, clear might fail on some systems
+		// Todo: remove original clear, if save for all platforms
+		SDL_RenderFillRect(Renderer, nullptr);
+		render::PresentVScreen();
+
+		ImGui::Render();
+		ImGui_Render_RenderDrawData(ImGui::GetDrawData());
+
+		SDL_RenderPresent(Renderer);
+
+		auto sdlError = SDL_GetError();
+		if (sdlError[0] || !PrevSdlError.empty())
+		{
+			if (sdlError[0])
+				SDL_ClearError();
+
+			// Rate limit duplicate SDL error messages.
+			if (sdlError != PrevSdlError)
+			{
+				PrevSdlError = sdlError;
+				if (PrevSdlErrorCount > 0)
+				{
+					printf("SDL Error: ^ Previous Error Repeated %u Times\n", PrevSdlErrorCount + 1);
+					PrevSdlErrorCount = 0;
+				}
+
+				if (sdlError[0])
+					printf("SDL Error: %s\n", sdlError);
+			}
+			else
+			{
+				PrevSdlErrorCount++;
+			}
+		}
+	}
+}
+#endif
 
 void winmain::MainLoop()
 {
@@ -1002,17 +1105,17 @@ int winmain::event_handler(const SDL_Event* event)
 			if (Options.Music && !single_step)
 				midi::music_play();
 			no_time_loss = true;
-			has_focus = true;
+			//has_focus = true;
 			break;
 		case SDL_WINDOWEVENT_FOCUS_LOST:
 		case SDL_WINDOWEVENT_HIDDEN:
 			activated = false;
 			fullscrn::activate(0);
 			Options.FullScreen = false;
-			Sound::Deactivate();
-			midi::music_stop();
-			has_focus = false;
-			pb::loose_focus();
+			//Sound::Deactivate();
+			//midi::music_stop();
+			//has_focus = false;
+			//pb::loose_focus();
 			break;
 		case SDL_WINDOWEVENT_SIZE_CHANGED:
 		case SDL_WINDOWEVENT_RESIZED:
