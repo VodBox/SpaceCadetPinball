@@ -1010,8 +1010,10 @@ void Deserialize(TableState state)
 		pb::MainTable->BallList.push_back(ball);
 	}
 
-	if (ballList.size())
+	if (ballList.size()) {
 		control::StartDeployed();
+		pb::MainTable->MultiballCount = ballList.size();
+	}
 }
 
 EMSCRIPTEN_BINDINGS(pinball)
