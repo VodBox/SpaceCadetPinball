@@ -2745,14 +2745,14 @@ void control::BallDrainControl(MessageCode code, TPinballComponent* caller)
 				lite199->Message(MessageCode::TLightResetAndTurnOff, 0.0);
 				midi::play_track(MidiTracks::Track1, false);
 			}
-			if (lite200->light_on())
+			if (lite200->light_on() && TableG->MultiballCount >= 1)
 			{
 				soundwave27->Play(nullptr, "BallDrainControl2");
 				lite200->Message(MessageCode::TLightResetAndTurnOn, 0.0);
 				info_text_box->Display(pb::get_rc_string(Msg::STRING197), -1.0);
 				soundwave59->Play(nullptr, "BallDrainControl3");
 			}
-			else if (lite199->light_on())
+			else if (lite199->light_on() && TableG->MultiballCount >= 1)
 			{
 				soundwave27->Play(nullptr, "BallDrainControl4");
 				lite199->Message(MessageCode::TLightResetAndTurnOff, 0.0);

@@ -1438,7 +1438,7 @@ const TextArray translations::Translations =
 			{ Lang::Danish, "Afventer affyring" },
 			{ Lang::German, "Startbereit" },
 			{ Lang::Greek, "Αναμονή εκτόξευσης" },
-			{ Lang::English, "Awaiting Deployment" },
+			{ Lang::English, "Awaiting Deployment (Insert Donation)" },
 			{ Lang::Spanish, "Esperando implementación" },
 			{ Lang::Finnish, "Odotetaan laukaisua" },
 			{ Lang::French, "Paré au lancement" },

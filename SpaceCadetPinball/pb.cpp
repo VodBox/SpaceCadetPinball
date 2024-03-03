@@ -874,6 +874,10 @@ bool AddBall(float a, float b)
 
 void SendBall()
 {
+	if (pb::game_mode == GameModes::GameOver)
+		pb::MainTable->Message(MessageCode::NewGame, 0.0);
+	if (pb::MainTable->LightShowTimer)
+		pb::MainTable->Message(MessageCode::NewGame, 0.0);
 	if (pb::MainTable->MultiballCount == 0)
 		control::StartDeployed();
 	control::SendInBall();
@@ -901,9 +905,9 @@ void ToggleLeftFlipper(bool up)
 void ToggleRightFlipper(bool up)
 {
 	if (up)
-		pb::MainTable->FlipperL->Message(MessageCode::TFlipperExtend, 0.0);
+		pb::MainTable->FlipperR->Message(MessageCode::TFlipperExtend, 0.0);
 	else
-		pb::MainTable->FlipperL->Message(MessageCode::TFlipperRetract, 0.0);
+		pb::MainTable->FlipperR->Message(MessageCode::TFlipperRetract, 0.0);
 }
 
 TableState Serialize()
@@ -1005,6 +1009,9 @@ void Deserialize(TableState state)
 
 		pb::MainTable->BallList.push_back(ball);
 	}
+
+	if (ballList.size())
+		control::StartDeployed();
 }
 
 EMSCRIPTEN_BINDINGS(pinball)
