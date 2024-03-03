@@ -987,6 +987,8 @@ void Deserialize(TableState state)
 
 	std::vector<BallState> ballList = vecFromJSArray<BallState>(state.BallList);
 
+	pb::MainTable->MultiballCount = 0;
+
 	for (auto &ballState : ballList) {
 		TBall *ball = new TBall(pb::MainTable, -1);
 
@@ -1005,14 +1007,15 @@ void Deserialize(TableState state)
 
 		if (!ballState.Active) {
 			ball->Disable();
+		} else {
+			pb::MainTable->MultiballCount++;
 		}
 
 		pb::MainTable->BallList.push_back(ball);
 	}
 
-	if (ballList.size()) {
+	if (pb::MainTable->MultiballCount) {
 		control::StartDeployed();
-		pb::MainTable->MultiballCount = ballList.size();
 	}
 }
 
