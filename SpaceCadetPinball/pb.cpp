@@ -877,6 +877,7 @@ void SendBall()
 	if (pb::MainTable->MultiballCount == 0)
 		control::StartDeployed();
 	control::SendInBall();
+	pb::MainTable->MultiballCount++;
 }
 
 int BallCount()
@@ -1022,7 +1023,7 @@ EMSCRIPTEN_BINDINGS(pinball)
 		.field("timeDelta", &BallState::TimeDelta)
 		.field("active", &BallState::Active);
 
-	register_vector<BallState>("vector<BallState>");
+	register_vector<BallState>("VectorBallState");
 
 	value_object<TableState>("TableState")
 		.field("score", &TableState::Score)

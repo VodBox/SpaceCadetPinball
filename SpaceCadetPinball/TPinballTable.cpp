@@ -56,7 +56,7 @@ TPinballTable::TPinballTable(): TPinballComponent(nullptr, -1, false)
 	LightShowTimer = 0;
 	ReplayTimer = 0;
 	TiltTimeoutTimer = 0;
-	MultiballFlag = false;
+	MultiballFlag = true;
 	PlayerCount = 0;
 
 	auto ball = AddBall({0.0f, 0.0f});
@@ -456,7 +456,7 @@ int TPinballTable::Message(MessageCode code, float value)
 			LightShowTimer = timer::set(time, this, LightShow_timeout);
 		}
 
-		if (pb::FullTiltMode)
+		if (pb::FullTiltMode || true)
 		{
 			// Multi-ball is FT exclusive feature, at least for now.
 			MultiballFlag = true;
@@ -585,7 +585,7 @@ int TPinballTable::Message(MessageCode code, float value)
 		ExtraBalls = 0;
 		MultiballCount = 0;
 		BallLockedCounter = 0;
-		MultiballFlag = false;
+		MultiballFlag = true;
 		UnknownP78 = 0;
 		ReplayActiveFlag = 0;
 		ReplayTimer = 0;
