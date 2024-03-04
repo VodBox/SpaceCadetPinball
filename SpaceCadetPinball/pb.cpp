@@ -1014,8 +1014,11 @@ void Deserialize(TableState state)
 		pb::MainTable->BallList.push_back(ball);
 	}
 
-	if (pb::MainTable->MultiballCount) {
-		control::StartDeployed();
+	control::StartDeployed();
+
+	if (!pb::MainTable->MultiballCount) {
+		control::SendInBall();
+		pb::MainTable->MultiballCount++;
 	}
 }
 
